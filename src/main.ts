@@ -4,6 +4,7 @@ import "./style.css"
 import PiniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import App from './App.vue'
 import router from './router'
+import 'element-plus/dist/index.css'
 
 const pinia = createPinia()
 pinia.use(PiniaPluginPersistedstate)

@@ -67,7 +67,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules, UploadInstance, UploadProps } from 'element-plus'
 import InternalApi from '@/apis/internal'
 import WSClient from '@/utils/websocket'
@@ -163,6 +163,8 @@ const handleLuaSuccess: UploadProps['onSuccess'] = (res) => {
 }
 
 const handleInputSuccess: UploadProps['onSuccess'] = (res) => {
+    console.log(res);
+
     const index = res.data.lastIndexOf('\\')
     data.inputPath = index !== -1 ? res.data.substring(0, index) : ''
 
@@ -199,10 +201,14 @@ const submitForm = async () => {
             },
 
             onMessage: (msg: any) => {
-                console.log("收到消息:", msg)
+                if (msg.type === "error") {
+                    ElMessageBox.alert(msg.text, "错误")
+                    console.log(msg.text);
+                } else {
+                    progress.value = msg.value || 0
+                    progressText.value = msg.text || ""
+                }
 
-                progress.value = msg.value || 0
-                progressText.value = msg.text || ""
             },
 
             onClose: () => {
@@ -228,11 +234,13 @@ const submitForm = async () => {
         await ruleFormRef.value.validate()
 
         var requestData = {
-            input_path: data.inputPath,
             rf_code: data.rfCode,
-            license_path: data.licensePath,
-            lua_script_path: data.luaScriptPath
+            local_script_path: data.luaScriptPath,
+            local_input_path: data.inputPath,
+            local_license_path: data.licensePath
         }
+        console.log(data.inputPath);
+
         await InternalApi.dataGenerateDev(requestData)
     } catch (err) {
         ElMessage.error("请检查表单")
