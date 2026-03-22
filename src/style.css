@@ -1,0 +1,19 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-size: 14px;
+}
+
+a {
+  outline: none;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+ul,
+li {
+  list-style-type: none;
+}
