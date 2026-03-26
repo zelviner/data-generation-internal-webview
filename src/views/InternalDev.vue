@@ -24,7 +24,7 @@
                     </el-upload>
                 </el-form-item>
 
-                <el-form-item label="输入文件夹" prop="inputPath">
+                <el-form-item label="输入文件夹" prop="inputDir">
                     <el-upload ref="inputUploadRef" class="upload-demo" drag :action="uploadUrl" :auto-upload="false"
                         directory multiple :before-upload="beforeUpload" :on-success="handleInputSuccess"
                         :data="uploadInputData">
@@ -54,10 +54,10 @@
                         {{ progressText }}
                     </div>
                     <div class="button-group">
-                        <el-button type="primary" @click="submitForm()">
+                        <el-button type="primary" @click="generation()" :disabled="isSubmit">
                             生成
                         </el-button>
-                        <el-button @click="">下载</el-button>
+                        <el-button @click="download()" :disabled="isSubmit">下载</el-button>
                     </div>
                 </div>
             </template>
@@ -75,7 +75,7 @@ import WSClient from '@/utils/websocket'
 interface RuleForm {
     rfCode: string
     luaScriptPath: string
-    inputPath: string
+    inputDir: string
     licensePath: string
 }
 
@@ -83,12 +83,12 @@ interface RuleForm {
 const data = reactive<RuleForm>({
     rfCode: "",
     luaScriptPath: "",
-    inputPath: "",
+    inputDir: "",
     licensePath: "",
 })
 
 // 上传地址
-const uploadUrl = `${import.meta.env.VITE_API_URL}/internal/uploadfile`
+const uploadUrl = `${import.meta.env.VITE_API_URL}/internal/upload`
 
 // refs
 const ruleFormRef = ref<FormInstance>()
@@ -96,8 +96,9 @@ const luaUploadRef = ref<UploadInstance>()
 const inputUploadRef = ref<UploadInstance>()
 const licenseUploadRef = ref<UploadInstance>()
 
-const progress = ref(0)
-const progressText = ref("")
+const progress = ref<number>(0)
+const progressText = ref<string>("")
+const isSubmit = ref<boolean>(false)
 let wsClient: WSClient | null = null
 
 // 表单规则
@@ -109,7 +110,7 @@ const rules: FormRules<RuleForm> = {
     luaScriptPath: [
         { required: true, message: '请上传 Lua 脚本', trigger: 'change' }
     ],
-    inputPath: [
+    inputDir: [
         { required: true, message: '请上传输入文件夹', trigger: 'change' }
     ],
     licensePath: [
@@ -137,7 +138,7 @@ const uploadLicenseData: UploadProps['data'] = (file: File) => ({
 })
 
 // 上传前校验
-const beforeUpload: UploadProps['beforeUpload'] = async (file) => {
+const beforeUpload: UploadProps['beforeUpload'] = async () => {
     if (!ruleFormRef.value) return false
 
     try {
@@ -156,26 +157,35 @@ const licenseUploadDone = ref<() => void>()
 
 // 上传成功
 const handleLuaSuccess: UploadProps['onSuccess'] = (res) => {
-    data.luaScriptPath = res.data
-    ruleFormRef.value?.validateField('luaScriptPath')
-
+    if (res.data) {
+        data.luaScriptPath = res.data
+        ruleFormRef.value?.validateField('luaScriptPath')
+    }
     luaUploadDone.value?.()
 }
 
 const handleInputSuccess: UploadProps['onSuccess'] = (res) => {
-    console.log(res);
+    if (!res.data) return
 
-    const index = res.data.lastIndexOf('\\')
-    data.inputPath = index !== -1 ? res.data.substring(0, index) : ''
+    if (!data.inputDir) {
+        const index = Math.max(
+            res.data.lastIndexOf('/'),
+            res.data.lastIndexOf('\\')
+        )
 
-    ruleFormRef.value?.validateField('inputPath')
+        data.inputDir = index !== -1 ? res.data.substring(0, index) : res.data
+
+        ruleFormRef.value?.validateField('inputDir')
+    }
 
     inputUploadDone.value?.()
 }
 
 const handleLicenseSuccess: UploadProps['onSuccess'] = (res) => {
-    data.licensePath = res.data
-    ruleFormRef.value?.validateField('licensePath')
+    if (res.data) {
+        data.licensePath = res.data
+        ruleFormRef.value?.validateField('licensePath')
+    }
 
     licenseUploadDone.value?.()
 }
@@ -187,10 +197,36 @@ function submitUpload(uploadRef: UploadInstance | undefined, doneRef: any) {
     })
 }
 
+const resetState = () => {
+    // 进度
+    progress.value = 0
+    progressText.value = ""
+
+    // 关闭 WS
+    if (wsClient) {
+        wsClient.close()
+        wsClient = null
+    }
+
+    // 清空上传组件
+    luaUploadRef.value?.clearFiles()
+    inputUploadRef.value?.clearFiles()
+    licenseUploadRef.value?.clearFiles()
+
+    isSubmit.value = false
+    data.luaScriptPath = ""
+    data.inputDir = ""
+    data.licensePath = ""
+
+    // 清校验状态
+    ruleFormRef.value?.clearValidate()
+}
+
 
 // 点击生成
-const submitForm = async () => {
+const generation = async () => {
     if (!ruleFormRef.value) return
+    isSubmit.value = true
 
     try {
         wsClient = new WSClient({
@@ -202,7 +238,22 @@ const submitForm = async () => {
 
             onMessage: (msg: any) => {
                 if (msg.type === "error") {
-                    ElMessageBox.alert(msg.text, "错误")
+                    ElMessageBox.alert(msg.text, "数据生成错误", {
+                        confirmButtonText: '确定',
+                        callback: () => {
+                            resetState()
+                        }
+                    })
+                    console.log(msg.text);
+                } else if (msg.type === "done") {
+                    progress.value = msg.value || 0
+                    progressText.value = msg.text || ""
+                    ElMessageBox.alert(msg.text, "数据生成完成", {
+                        confirmButtonText: '确定',
+                        callback: () => {
+                            resetState()
+                        }
+                    })
                     console.log(msg.text);
                 } else {
                     progress.value = msg.value || 0
@@ -236,16 +287,25 @@ const submitForm = async () => {
         var requestData = {
             rf_code: data.rfCode,
             local_script_path: data.luaScriptPath,
-            local_input_path: data.inputPath,
+            local_input_dir: data.inputDir,
             local_license_path: data.licensePath
         }
-        console.log(data.inputPath);
-
         await InternalApi.dataGenerateDev(requestData)
     } catch (err) {
         ElMessage.error("请检查表单")
         console.log(err)
+        resetState()
     }
+}
+
+const download = async () => {
+    if (!data.rfCode) {
+        ElMessage.error("请先填写需求编码")
+        return
+    }
+
+    const url = `${import.meta.env.VITE_API_URL}/internal/download?rfCode=${encodeURIComponent(data.rfCode)}`
+    window.open(url)
 }
 
 </script>

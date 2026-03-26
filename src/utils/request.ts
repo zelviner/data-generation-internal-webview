@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from "axios"
+import axios, { type AxiosInstance, type AxiosResponse } from "axios"
 import { useUserStore } from "@/stores/user.js"
 
 // 响应统一结构
@@ -48,7 +48,15 @@ const Request = {
     get<T = any>(url: string, params: Record<string, any> = {}): Promise<T> {
         return axiosInstance
             .get<any, AxiosResponse<ApiResponse<T>>>(url, { params })
-            .then(res => res.data.data)
+            .then(res => {
+                const r = res.data
+
+                if (r.code !== 200) {
+                    throw r
+                }
+
+                return r.data
+            })
             .catch(handleError)
     },
 
@@ -56,7 +64,15 @@ const Request = {
     post<T = any>(url: string, data?: any): Promise<T> {
         return axiosInstance
             .post<any, AxiosResponse<ApiResponse<T>>>(url, data)
-            .then(res => res.data.data)
+            .then(res => {
+                const r = res.data
+
+                if (r.code !== 200) {
+                    throw r
+                }
+
+                return r.data
+            })
             .catch(handleError)
     },
 
@@ -66,7 +82,15 @@ const Request = {
             .post<any, AxiosResponse<ApiResponse<T>>>(url, data, {
                 headers: { "Content-Type": "application/x-www-form-urlencoded" }
             })
-            .then(res => res.data.data)
+            .then(res => {
+                const r = res.data
+
+                if (r.code !== 200) {
+                    throw r
+                }
+
+                return r.data
+            })
             .catch(handleError)
     },
 
@@ -76,7 +100,15 @@ const Request = {
             .post<any, AxiosResponse<ApiResponse<T>>>(url, data, {
                 headers: { "Content-Type": "multipart/form-data" }
             })
-            .then(res => res.data.data)
+            .then(res => {
+                const r = res.data
+
+                if (r.code !== 200) {
+                    throw r
+                }
+
+                return r.data
+            })
             .catch(handleError)
     },
 
@@ -84,7 +116,15 @@ const Request = {
     put<T = any>(url: string, data?: any): Promise<T> {
         return axiosInstance
             .put<any, AxiosResponse<ApiResponse<T>>>(url, data)
-            .then(res => res.data.data)
+            .then(res => {
+                const r = res.data
+
+                if (r.code !== 200) {
+                    throw r
+                }
+
+                return r.data
+            })
             .catch(handleError)
     },
 
@@ -92,7 +132,15 @@ const Request = {
     delete<T = any>(url: string, params?: any): Promise<T> {
         return axiosInstance
             .delete<any, AxiosResponse<ApiResponse<T>>>(url, { params })
-            .then(res => res.data.data)
+            .then(res => {
+                const r = res.data
+
+                if (r.code !== 200) {
+                    throw r
+                }
+
+                return r.data
+            })
             .catch(handleError)
     }
 };
