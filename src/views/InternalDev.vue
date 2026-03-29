@@ -251,6 +251,8 @@ const generation = async () => {
             local_license_path: data.licensePath
         }
         const rep = await InternalApi.startTaskDev(requestData)
+        console.log(rep);
+
         wsClient = new WSClient({
             url: `/ws?task_id=${rep.task_id}`,
 
@@ -258,6 +260,8 @@ const generation = async () => {
                 console.log("ws 已连接")
 
                 const state = await InternalApi.taskState(rep.task_id)
+                console.log(state);
+
                 progress.value = state.value || 0
                 progressText.value = state.text || ""
 
