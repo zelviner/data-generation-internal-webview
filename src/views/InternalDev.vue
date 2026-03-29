@@ -254,8 +254,16 @@ const generation = async () => {
         wsClient = new WSClient({
             url: `/ws?task_id=${rep.task_id}`,
 
-            onOpen: () => {
+            onOpen: async () => {
                 console.log("ws 已连接")
+
+                const state = await InternalApi.taskState(rep.task_id)
+                progress.value = state.value || 0
+                progressText.value = state.text || ""
+
+                if (state.status === "done" || state.status === "error") {
+                    wsClient?.close()
+                }
             },
 
             onMessage: (msg: any) => {

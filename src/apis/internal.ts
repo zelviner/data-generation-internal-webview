@@ -16,6 +16,10 @@ const InternalApi = {
     ftp<T = any>(params: any): Promise<T> {
         return Request.post<T>("/internal/ftp-file-tree", params)
     },
+
+    taskState(taskId: string) {
+        return Request.get("/internal/task-state", { task_id: taskId })
+    }
 }
 
 export default InternalApi
