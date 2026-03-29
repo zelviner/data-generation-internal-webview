@@ -57,10 +57,8 @@
                         {{ progressText }}
                     </div>
                     <div class="button-group">
-                        <el-button type="primary" @click="generation()">
-                            生成
-                        </el-button>
-                        <el-button @click="resetForm(ruleFormRef)">清空</el-button>
+                        <el-button type="primary" @click="generation()" :disabled="isSubmit">生成</el-button>
+                        <el-button @click="resetForm(ruleFormRef)" :disabled="isSubmit">清空</el-button>
                     </div>
                 </div>
             </template>
@@ -156,6 +154,8 @@ const rules = reactive<FormRules<Data>>({
     ],
 })
 
+
+
 const resetState = () => {
     // 进度
     progress.value = 0
@@ -183,16 +183,31 @@ const generation = async () => {
     if (!ruleFormRef.value) return
     isSubmit.value = true
 
-    try {
-        wsClient = new WSClient({
-            url: `/ws?rf_code=${data.orderNo}`,
+    if (wsClient) {
+        wsClient.close()
+    }
 
-            onOpen: () => {
+    try {
+        await ruleFormRef.value.validate()
+
+        var requestData = {
+            order_no: data.orderNo,
+            script_path: data.luaScriptPath,
+            input_dir: data.inputDir,
+            license_dir: data.licenseDir,
+            pgp_path: data.pgpKeyPath,
+            is_deduplication: data.isDeduplication
+        }
+        const rep = await InternalApi.startTask(requestData)
+        wsClient = new WSClient({
+            url: `/ws?task_id=${rep.task_id}`,
+
+            onOpen: async () => {
                 console.log("ws 已连接")
             },
 
             onMessage: (msg: any) => {
-                if (msg.type === "error") {
+                if (msg.status === "error") {
                     ElMessageBox.alert(msg.text, "数据生成错误", {
                         confirmButtonText: '确定',
                         callback: () => {
@@ -200,7 +215,7 @@ const generation = async () => {
                         }
                     })
                     console.log(msg.text);
-                } else if (msg.type === "done") {
+                } else if (msg.status === "done") {
                     progress.value = msg.value || 0
                     progressText.value = msg.text || ""
                     ElMessageBox.alert(msg.text, "数据生成完成", {
@@ -227,21 +242,6 @@ const generation = async () => {
         })
 
         wsClient.connect()
-
-
-        await ruleFormRef.value.validate()
-
-        var requestData = {
-            order_no: data.orderNo,
-            script_path: data.luaScriptPath,
-            input_dir: data.inputDir,
-            license_dir: data.licenseDir,
-            pgp_path: data.pgpKeyPath,
-            is_deduplication: data.isDeduplication
-        }
-        console.log(requestData);
-
-        await InternalApi.dataGenerate(requestData)
     } catch (err) {
         ElMessage.error("请检查表单")
         console.log(err)
@@ -252,6 +252,12 @@ const generation = async () => {
 
 const resetForm = (formEl: FormInstance | undefined) => {
     if (!formEl) return
+
+    if (wsClient) {
+        wsClient.close()
+        wsClient = null
+    }
+
     formEl.resetFields()
 }
 
@@ -268,7 +274,7 @@ const resetForm = (formEl: FormInstance | undefined) => {
         display: flex;
         flex-direction: column;
         width: 650px;
-        height: 550px;
+        height: 580px;
 
         .card-header {
             text-align: center;

@@ -1,12 +1,12 @@
 import Request from "@/utils/request"
 
 const InternalApi = {
-    dataGenerate<T = any>(params: any): Promise<T> {
-        return Request.post<T>("/internal/data-generate", params)
+    startTask<T = any>(params: any): Promise<T> {
+        return Request.post<T>("/internal/start-task", params)
     },
 
-    dataGenerateDev<T = any>(params: any): Promise<T> {
-        return Request.post<T>("/internal/data-generate-dev", params)
+    startTaskDev<T = any>(params: any): Promise<T> {
+        return Request.post<T>("/internal/start-task-dev", params)
     },
 
     download<T = any>(params: any): Promise<T> {

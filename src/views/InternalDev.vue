@@ -228,16 +228,38 @@ const generation = async () => {
     if (!ruleFormRef.value) return
     isSubmit.value = true
 
+    if (wsClient) {
+        wsClient.close()
+    }
+
     try {
+        // 上传文件
+        await Promise.all([
+            submitUpload(luaUploadRef.value, luaUploadDone),
+            submitUpload(inputUploadRef.value, inputUploadDone),
+            submitUpload(licenseUploadRef.value, licenseUploadDone)
+        ])
+
+        ElMessage.success("上传完成")
+
+        await ruleFormRef.value.validate()
+
+        var requestData = {
+            rf_code: data.rfCode,
+            local_script_path: data.luaScriptPath,
+            local_input_dir: data.inputDir,
+            local_license_path: data.licensePath
+        }
+        const rep = await InternalApi.startTaskDev(requestData)
         wsClient = new WSClient({
-            url: `/ws?rf_code=${data.rfCode}`,
+            url: `/ws?task_id=${rep.task_id}`,
 
             onOpen: () => {
                 console.log("ws 已连接")
             },
 
             onMessage: (msg: any) => {
-                if (msg.type === "error") {
+                if (msg.status === "error") {
                     ElMessageBox.alert(msg.text, "数据生成错误", {
                         confirmButtonText: '确定',
                         callback: () => {
@@ -245,7 +267,7 @@ const generation = async () => {
                         }
                     })
                     console.log(msg.text);
-                } else if (msg.type === "done") {
+                } else if (msg.status === "done") {
                     progress.value = msg.value || 0
                     progressText.value = msg.text || ""
                     ElMessageBox.alert(msg.text, "数据生成完成", {
@@ -272,25 +294,6 @@ const generation = async () => {
         })
 
         wsClient.connect()
-
-        // 上传文件
-        await Promise.all([
-            submitUpload(luaUploadRef.value, luaUploadDone),
-            submitUpload(inputUploadRef.value, inputUploadDone),
-            submitUpload(licenseUploadRef.value, licenseUploadDone)
-        ])
-
-        ElMessage.success("上传完成")
-
-        await ruleFormRef.value.validate()
-
-        var requestData = {
-            rf_code: data.rfCode,
-            local_script_path: data.luaScriptPath,
-            local_input_dir: data.inputDir,
-            local_license_path: data.licensePath
-        }
-        await InternalApi.dataGenerateDev(requestData)
     } catch (err) {
         ElMessage.error("请检查表单")
         console.log(err)
