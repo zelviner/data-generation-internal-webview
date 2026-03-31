@@ -154,7 +154,9 @@ const rules = reactive<FormRules<Data>>({
     ],
 })
 
-
+const looksLikeDir = (p: string) => {
+    return p.endsWith('/') || p.endsWith('\\')
+}
 
 const resetState = () => {
     // 进度
@@ -189,6 +191,12 @@ const generation = async () => {
 
     try {
         await ruleFormRef.value.validate()
+
+        // 校验是否是文件夹
+        if (!looksLikeDir(data.inputDir) || !looksLikeDir(data.licenseDir)) {
+            ElMessage.error("输入或授权文件夹必须是文件夹")
+            return
+        }
 
         var requestData = {
             order_no: data.orderNo,
