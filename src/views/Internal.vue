@@ -154,10 +154,6 @@ const rules = reactive<FormRules<Data>>({
     ],
 })
 
-const looksLikeDir = (p: string) => {
-    return p.endsWith('/') || p.endsWith('\\')
-}
-
 const resetState = () => {
     // 进度
     progress.value = 0
@@ -193,8 +189,9 @@ const generation = async () => {
         await ruleFormRef.value.validate()
 
         // 校验是否是文件夹
-        if (!looksLikeDir(data.inputDir) || !looksLikeDir(data.licenseDir)) {
-            ElMessage.error("输入或授权文件夹必须是文件夹")
+        if (data.inputDir.includes('.') || data.licenseDir.includes('.')) {
+            ElMessage.error("输入或授权不是文件夹，请检查")
+            resetState()
             return
         }
 
@@ -214,24 +211,24 @@ const generation = async () => {
                 console.log("ws 已连接")
 
                 const state = await InternalApi.taskState(rep.task_id)
-                progress.value = state.value || 0
-                progressText.value = state.text || ""
-
-                if (state.status === "done" || state.status === "error") {
-                    wsClient?.close()
-                }
-            },
-
-            onMessage: (msg: any) => {
-                if (msg.status === "error") {
-                    ElMessageBox.alert(msg.text, "数据生成错误", {
+                if (state.status === "error" || state.status === "done") {
+                    progress.value = state.value || 0
+                    progressText.value = state.text || ""
+                    ElMessageBox.alert(state.text, "数据生成完成", {
                         confirmButtonText: '确定',
                         callback: () => {
                             resetState()
                         }
                     })
-                    console.log(msg.text);
-                } else if (msg.status === "done") {
+                    console.log(state.text);
+                } else {
+                    progress.value = state.value || 0
+                    progressText.value = state.text || ""
+                }
+            },
+
+            onMessage: (msg: any) => {
+                if (msg.status === "error" || msg.status === "done") {
                     progress.value = msg.value || 0
                     progressText.value = msg.text || ""
                     ElMessageBox.alert(msg.text, "数据生成完成", {
@@ -245,7 +242,6 @@ const generation = async () => {
                     progress.value = msg.value || 0
                     progressText.value = msg.text || ""
                 }
-
             },
 
             onClose: () => {
