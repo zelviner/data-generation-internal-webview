@@ -53,6 +53,13 @@
 import { ref, watch } from "vue"
 import InternalApi from "@/apis/internal"
 
+interface FileItem {
+    id: string | number
+    title: string
+    create: string | number | Date
+    isDir: boolean
+}
+
 const props = defineProps({
     modelValue: Boolean,
     initPath: {
@@ -70,7 +77,7 @@ const emit = defineEmits(["update:modelValue", "select"])
 const visible = ref(false)
 const loading = ref(false)
 
-const currentList = ref<any[]>([])
+const currentList = ref<FileItem[]>([])
 const selected = ref<any>(null)
 
 // 路径栈（用于面包屑）
@@ -133,10 +140,14 @@ const loadDir = async (path: string) => {
 
         const res = await InternalApi.ftp({ path })
 
-        currentList.value = res || []
+        const list = (res || []).slice().sort((a: FileItem, b: FileItem) => {
+            return new Date(b.create).getTime() - new Date(a.create).getTime()
+        })
+
+        currentList.value = list
         currentPath.value = path
 
-        cache.set(path, res || [])
+        cache.set(path, list)
     } finally {
         loading.value = false
     }
