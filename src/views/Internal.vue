@@ -214,7 +214,8 @@ const generation = async () => {
                 if (state.status === "error" || state.status === "done") {
                     progress.value = state.value || 0
                     progressText.value = state.text || ""
-                    ElMessageBox.alert(state.text, "数据生成完成", {
+                    let title = state.status === "error" ? "数据生成失败" : "数据生成完成"
+                    ElMessageBox.alert(state.text, title, {
                         confirmButtonText: '确定',
                         callback: () => {
                             resetState()
@@ -231,7 +232,8 @@ const generation = async () => {
                 if (msg.status === "error" || msg.status === "done") {
                     progress.value = msg.value || 0
                     progressText.value = msg.text || ""
-                    ElMessageBox.alert(msg.text, "数据生成完成", {
+                    let title = msg.status === "error" ? "数据生成失败" : "数据生成完成"
+                    ElMessageBox.alert(msg.text, title, {
                         confirmButtonText: '确定',
                         callback: () => {
                             resetState()

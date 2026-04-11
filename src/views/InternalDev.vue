@@ -270,7 +270,7 @@ const generation = async () => {
 
             onMessage: (msg: any) => {
                 if (msg.status === "error") {
-                    ElMessageBox.alert(msg.text, "数据生成错误", {
+                    ElMessageBox.alert(msg.text, "数据生成失败", {
                         confirmButtonText: '确定',
                         callback: () => {
                             resetState()
