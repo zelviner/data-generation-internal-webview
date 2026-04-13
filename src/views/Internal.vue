@@ -176,6 +176,10 @@ const resetState = () => {
     ruleFormRef.value?.clearValidate()
 }
 
+const isDir = (path: string) => {
+    return !path.split('/').pop()?.includes('.')
+}
+
 // 点击生成
 const generation = async () => {
     if (!ruleFormRef.value) return
@@ -189,7 +193,7 @@ const generation = async () => {
         await ruleFormRef.value.validate()
 
         // 校验是否是文件夹
-        if (data.inputDir.includes('.') || data.licenseDir.includes('.')) {
+        if (!isDir(data.inputDir) || !isDir(data.licenseDir)) {
             ElMessage.error("输入或授权不是文件夹，请检查")
             resetState()
             return

@@ -201,7 +201,7 @@ const goRoot = async () => {
 const confirm = () => {
     emit("select", {
         node: selected.value,
-        path: currentPath.value + "/" + selected.value.title,
+        path: currentPath.value + selected.value.title,
     })
     visible.value = false
 }
