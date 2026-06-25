@@ -16,6 +16,7 @@ class WSClient<T = any> {
     private maxRetry = 10
     private manualClose = false
     private isConnecting = false
+    private reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
     constructor(options: WSOptions<T>) {
         this.options = options
@@ -42,15 +43,16 @@ class WSClient<T = any> {
 
     connect() {
         this.manualClose = false
-
-        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-            this.ws = null
-        }
+        this.clearReconnectTimer()
 
         // 防止重复连接
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) return
+        if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
+            return
+        }
+
         if (this.isConnecting) return
 
+        this.ws = null
         this.isConnecting = true
 
         const userStore = useUserStore()
@@ -68,21 +70,24 @@ class WSClient<T = any> {
         this.ws = ws
         console.log("WS connecting:", url)
 
+        ws.onopen = () => {
+            if (this.ws !== ws) return
 
-        this.ws.onopen = () => {
             this.isConnecting = false
             this.retryCount = 0
 
             // 发送缓存消息
             this.queue.forEach(msg => {
-                this.ws?.send(JSON.stringify(msg))
+                ws.send(JSON.stringify(msg))
             })
             this.queue = []
 
             this.options.onOpen?.()
         }
 
-        this.ws.onmessage = (event) => {
+        ws.onmessage = (event) => {
+            if (this.ws !== ws) return
+
             try {
                 const data = JSON.parse(event.data)
                 this.options.onMessage?.(data)
@@ -91,7 +96,9 @@ class WSClient<T = any> {
             }
         }
 
-        this.ws.onclose = () => {
+        ws.onclose = () => {
+            if (this.ws && this.ws !== ws) return
+
             console.log("WS closed")
             this.isConnecting = false
             this.options.onClose?.()
@@ -101,26 +108,42 @@ class WSClient<T = any> {
             }
         }
 
-        this.ws.onerror = (err) => {
+        ws.onerror = (err) => {
+            if (this.ws && this.ws !== ws) return
+
             console.error("WS error:", err)
             this.options.onError?.(err)
         }
     }
 
     private reconnect() {
+        if (this.manualClose) return
+
         if (this.retryCount >= this.maxRetry) {
             console.warn("WS 重连次数达到上限")
             return
         }
 
+        this.clearReconnectTimer()
+
         const delay = Math.min(1000 * 2 ** this.retryCount, 10000) // 最大10秒
 
         console.log(`WS 重连中... ${delay}ms`)
 
-        setTimeout(() => {
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null
+            if (this.manualClose) return
+
             this.retryCount++
             this.connect()
         }, delay)
+    }
+
+    private clearReconnectTimer() {
+        if (!this.reconnectTimer) return
+
+        clearTimeout(this.reconnectTimer)
+        this.reconnectTimer = null
     }
 
     private queue: any[] = []
@@ -137,9 +160,13 @@ class WSClient<T = any> {
 
     close() {
         this.manualClose = true
-        this.ws?.close()
+        this.clearReconnectTimer()
+        this.isConnecting = false
+
+        const ws = this.ws
         this.ws = null
         this.queue = []
+        ws?.close()
     }
 }
 

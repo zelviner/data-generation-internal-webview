@@ -1,5 +1,5 @@
 <template>
-    <el-dialog v-model="visible" width="800px" class="ftp-dialog">
+    <el-dialog v-model="visible" width="860px" class="ftp-dialog">
         <!-- header -->
         <template #header>
             <div class="dialog-header">
@@ -52,6 +52,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue"
 import InternalApi from "@/apis/internal"
+import { getErrorMessage } from "@/utils/error"
+import { joinDirPath, joinFilePath, normalizeDirPath } from "@/utils/ftpPath"
 
 interface FileItem {
     id: string | number
@@ -78,13 +80,13 @@ const visible = ref(false)
 const loading = ref(false)
 
 const currentList = ref<FileItem[]>([])
-const selected = ref<any>(null)
+const selected = ref<FileItem | null>(null)
 
 // 路径栈（用于面包屑）
 const pathStack = ref<{ name: string; path: string }[]>([])
 
 // 缓存（核心优化点）
-const cache = new Map<string, any[]>()
+const cache = new Map<string, FileItem[]>()
 
 // 当前路径
 const currentPath = ref("/")
@@ -94,8 +96,10 @@ watch(
     async (v) => {
         visible.value = v
         if (v) {
-            buildPathStack(props.initPath)
-            await loadDir(props.initPath)
+            const initPath = normalizeDirPath(props.initPath)
+            selected.value = null
+            buildPathStack(initPath)
+            await loadDir(initPath)
         }
     }
 )
@@ -103,7 +107,7 @@ watch(
 watch(visible, (v) => emit("update:modelValue", v))
 
 const buildPathStack = (path: string) => {
-    const parts = path.split('/').filter(Boolean)
+    const parts = normalizeDirPath(path).split('/').filter(Boolean)
 
     const stack: { name: string; path: string }[] = []
 
@@ -120,49 +124,49 @@ const buildPathStack = (path: string) => {
     pathStack.value = stack
 }
 
-const joinPath = (base: string, name: string) => {
-    return base.replace(/\/+$/, '') + '/' + name + '/'
-}
-
 // 加载目录
 const loadDir = async (path: string) => {
     if (loading.value) return
+    const normalizedPath = normalizeDirPath(path)
 
     // 命中缓存
-    if (cache.has(path)) {
-        currentList.value = cache.get(path)!
-        currentPath.value = path
+    if (cache.has(normalizedPath)) {
+        currentList.value = cache.get(normalizedPath)!
+        currentPath.value = normalizedPath
         return
     }
 
     try {
         loading.value = true
 
-        const res = await InternalApi.ftp({ path })
+        const res = await InternalApi.ftp<FileItem[]>({ path: normalizedPath })
 
         const list = (res || []).slice().sort((a: FileItem, b: FileItem) => {
             return new Date(b.create).getTime() - new Date(a.create).getTime()
         })
 
         currentList.value = list
-        currentPath.value = path
+        currentPath.value = normalizedPath
 
-        cache.set(path, list)
+        cache.set(normalizedPath, list)
+    } catch (err) {
+        currentList.value = []
+        ElMessage.error(getErrorMessage(err, "加载文件列表失败"))
     } finally {
         loading.value = false
     }
 }
 
 // 点击选中
-const select = (item: any) => {
+const select = (item: FileItem) => {
     selected.value = item
 }
 
 // 双击进入目录
-const enter = async (item: any) => {
+const enter = async (item: FileItem) => {
     if (!item.isDir) return
 
-    const nextPath = joinPath(currentPath.value, item.title)
+    const nextPath = joinDirPath(currentPath.value, item.title)
 
     pathStack.value.push({
         name: item.title,
@@ -199,16 +203,18 @@ const goRoot = async () => {
 
 // 确认
 const confirm = () => {
+    if (!selected.value) return
+
     emit("select", {
         node: selected.value,
-        path: currentPath.value + selected.value.title,
+        path: joinFilePath(currentPath.value, selected.value.title),
     })
     visible.value = false
 }
 
 const close = () => (visible.value = false)
 
-const formatDate = (d: any) => {
+const formatDate = (d: FileItem["create"]) => {
     if (!d) return ""
     return new Date(d).toLocaleString()
 }
@@ -221,10 +227,11 @@ const formatDate = (d: any) => {
     display: flex;
     align-items: center;
     gap: 10px;
+    border-radius: 4px;
 }
 
 .file-list {
-    height: 400px;
+    height: 460px;
     padding: 20px;
 }
 

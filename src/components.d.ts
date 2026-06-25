@@ -31,6 +31,7 @@ declare module 'vue' {
     IEpUploadFilled: typeof import('~icons/ep/upload-filled')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TaskOverlay: typeof import('./components/TaskOverlay.vue')['default']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']
