@@ -207,6 +207,12 @@ const description = computed(() => {
 </script>
 
 <style scoped lang="scss">
+@property --ring-progress {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+
 .task-overlay {
     position: fixed;
     inset: 0;
@@ -264,6 +270,7 @@ const description = computed(() => {
         conic-gradient(var(--ring-color) var(--ring-progress), #e5eaf3 0),
         #f5f7fa;
     box-shadow: 0 18px 48px rgba(64, 158, 255, 0.18);
+    transition: --ring-progress 0.55s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
 }
 
 .progress-ring::before {
@@ -303,6 +310,7 @@ const description = computed(() => {
     color: #606266;
     font-size: 13px;
     font-style: normal;
+    transition: color 0.2s ease, opacity 0.2s ease;
 }
 
 .orbit {
