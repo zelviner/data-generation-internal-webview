@@ -26,6 +26,13 @@
                     <h2>{{ title }}</h2>
                     <p>{{ description }}</p>
 
+                    <div v-if="details?.length" class="task-details">
+                        <div v-for="item in details" :key="item.label" class="detail-item">
+                            <span>{{ item.label }}</span>
+                            <strong :title="item.value">{{ item.value || "-" }}</strong>
+                        </div>
+                    </div>
+
                     <div class="stage-rail">
                         <div v-for="(stage, index) in stages" :key="stage.label" class="stage-item"
                             :class="getStageClass(index)">
@@ -36,7 +43,12 @@
                 </div>
 
                 <div v-if="isFinished" class="task-actions">
-                    <el-button type="primary" size="large" @click="$emit('close')">
+                    <el-button v-if="showDownload && status === 'done'" type="primary" size="large"
+                        @click="$emit('download')">
+                        下载
+                    </el-button>
+                    <el-button :type="showDownload && status === 'done' ? 'default' : 'primary'" size="large"
+                        @click="$emit('close')">
                         {{ status === 'error' ? '返回修改' : '关闭' }}
                     </el-button>
                 </div>
@@ -55,10 +67,16 @@ const props = defineProps<{
     status: TaskStatus
     progress: number
     text?: string
+    details?: Array<{
+        label: string
+        value: string
+    }>
+    showDownload?: boolean
 }>()
 
 defineEmits<{
     close: []
+    download: []
 }>()
 
 let timer: ReturnType<typeof window.setInterval> | null = null
@@ -388,6 +406,39 @@ p {
     color: #606266;
     font-size: 15px;
     line-height: 1.7;
+}
+
+.task-details {
+    display: grid;
+    gap: 10px;
+    margin-top: 22px;
+    padding: 14px;
+    border: 1px solid #e4e7ed;
+    border-radius: 14px;
+    background: rgba(245, 247, 250, 0.72);
+    text-align: left;
+}
+
+.detail-item {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+}
+
+.detail-item span {
+    color: #909399;
+    font-size: 13px;
+}
+
+.detail-item strong {
+    min-width: 0;
+    overflow: hidden;
+    color: #303133;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .stage-rail {

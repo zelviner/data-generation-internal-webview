@@ -68,11 +68,11 @@
     </div>
 
     <TaskOverlay :model-value="taskOverlayVisible" :status="taskStatus" :progress="progress" :text="progressText"
-        @close="closeTaskOverlay" />
+        :details="taskDetails" show-download @download="download" @close="closeTaskOverlay" />
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, type Ref } from 'vue'
+import { computed, ref, reactive, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadFile, UploadFiles, UploadInstance, UploadProps } from 'element-plus'
 import TaskOverlay from "@/components/TaskOverlay.vue"
@@ -113,8 +113,19 @@ let wsClient: WSClient | null = null
 let wsErrorShown = false
 const activeRunID = ref<string>("")
 const downloadRunID = ref<string>("")
+const luaScriptName = ref<string>("")
 
 type TaskStatus = 'idle' | 'uploading' | 'starting' | 'running' | 'done' | 'error'
+
+const taskDetails = computed(() => [
+    { label: "需求编码", value: data.rfCode },
+    { label: "Lua 脚本", value: getFileName(data.luaScriptPath || luaScriptName.value) },
+])
+
+const getFileName = (path: string) => {
+    const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    return index === -1 ? path : path.slice(index + 1)
+}
 
 // 表单规则
 const rules: FormRules<RuleForm> = {
@@ -192,12 +203,16 @@ const updateUploadCount = (target: Ref<number>, files: UploadFiles) => {
     target.value = files.length
 }
 
-const handleLuaChange: UploadProps['onChange'] = (_file, files) => updateUploadCount(luaFileCount, files)
+const handleLuaChange: UploadProps['onChange'] = (_file, files) => {
+    updateUploadCount(luaFileCount, files)
+    luaScriptName.value = files[0]?.name || ""
+}
 const handleInputChange: UploadProps['onChange'] = (_file, files) => updateUploadCount(inputFileCount, files)
 const handleLicenseChange: UploadProps['onChange'] = (_file, files) => updateUploadCount(licenseFileCount, files)
 
 const handleLuaRemove: UploadProps['onRemove'] = (_file, files) => {
     updateUploadCount(luaFileCount, files)
+    luaScriptName.value = files[0]?.name || ""
     if (!files.length) data.luaScriptPath = ""
 }
 
@@ -358,6 +373,7 @@ const resetState = () => {
     data.luaScriptPath = ""
     data.inputDir = ""
     data.licensePath = ""
+    luaScriptName.value = ""
     luaFileCount.value = 0
     inputFileCount.value = 0
     licenseFileCount.value = 0

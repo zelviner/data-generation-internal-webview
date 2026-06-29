@@ -70,11 +70,11 @@
 
     <FileDialog v-model="showDialog" :init-path="currentInitPath" :title="dialogTitle" @select="handleSelect" />
     <TaskOverlay :model-value="taskOverlayVisible" :status="taskStatus" :progress="progress" :text="progressText"
-        @close="closeTaskOverlay" />
+        :details="taskDetails" @close="closeTaskOverlay" />
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import FileDialog from "@/components/FileDialog.vue"
 import TaskOverlay from "@/components/TaskOverlay.vue"
 import InternalApi from '@/apis/internal'
@@ -97,6 +97,16 @@ let wsClient: WSClient | null = null
 let wsErrorShown = false
 
 type TaskStatus = 'idle' | 'uploading' | 'starting' | 'running' | 'done' | 'error'
+
+const taskDetails = computed(() => [
+    { label: "订单号", value: data.orderNo },
+    { label: "Lua 脚本", value: getFileName(data.luaScriptPath) },
+])
+
+const getFileName = (path: string) => {
+    const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    return index === -1 ? path : path.slice(index + 1)
+}
 
 interface FtpNode {
     node: {
