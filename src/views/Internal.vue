@@ -163,9 +163,6 @@ const rules = reactive<FormRules<Data>>({
     licenseDir: [
         { required: true, message: '请选择授权文件夹', trigger: 'blur' }
     ],
-    pgpKeyPath: [
-        { required: true, message: '请选择 PGP 密钥', trigger: 'blur' }
-    ],
 })
 
 const resetState = () => {
