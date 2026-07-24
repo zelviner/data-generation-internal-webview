@@ -27,7 +27,7 @@
                     </el-form-item>
 
                     <el-form-item label="打印格式">
-                        <el-input v-model="data.printScriptPath" placeholder="可选；请选择 PRINT_Vxx.lua">
+                        <el-input v-model="data.printScriptPath" placeholder="可选；请选择 PRINT.lua 或 PRINT_名称.lua">
                             <template #append>
                                 <el-button @click="openFileDialog('打印 Lua', '/input/Lua')">浏览</el-button>
                             </template>
@@ -224,21 +224,6 @@ const isDir = (path: string) => {
     return !path.split('/').pop()?.includes('.')
 }
 
-const resolvePrintTemplate = (luaScriptPath: string, printScriptPath: string) => {
-    if (!printScriptPath) return ""
-
-    const mainName = getFileName(luaScriptPath)
-    const printName = getFileName(printScriptPath)
-    const mainMatch = mainName.match(/^(.*)_DG_V[0-9]+\.lua$/i)
-    const printMatch = printName.match(/^(.*)_PRINT_(V[0-9]+)\.lua$/i)
-
-    if (!mainMatch || !printMatch || mainMatch[1] !== printMatch[1]) {
-        throw new Error("打印格式必须与主 Lua 同项目，且命名为 *_PRINT_Vxx.lua")
-    }
-
-    return printMatch[2].toUpperCase()
-}
-
 const showTaskResult = (msg: TaskMessage) => {
     progress.value = msg.value || 0
     progressText.value = msg.text || ""
@@ -275,8 +260,6 @@ const generation = async () => {
             return
         }
 
-        const printTemplate = resolvePrintTemplate(data.luaScriptPath, data.printScriptPath)
-
         progress.value = 0
         progressText.value = ""
         taskStatus.value = 'starting'
@@ -289,7 +272,6 @@ const generation = async () => {
             license_dir: data.licenseDir,
             pgp_path: data.pgpKeyPath,
             print_script_path: data.printScriptPath,
-            print_template: printTemplate,
             is_deduplication: data.isDeduplication
         }
         const rep = await InternalApi.startTask(requestData)

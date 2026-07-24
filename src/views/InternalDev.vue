@@ -95,6 +95,7 @@ import { getErrorMessage } from '@/utils/error'
 interface RuleForm {
     rfCode: string
     luaScriptPath: string
+    printScriptPath: string
     inputDir: string
     licensePath: string
 }
@@ -103,6 +104,7 @@ interface RuleForm {
 const data = reactive<RuleForm>({
     rfCode: "",
     luaScriptPath: "",
+    printScriptPath: "",
     inputDir: "",
     licensePath: "",
 })
@@ -240,6 +242,7 @@ const handleLuaRemove: UploadProps['onRemove'] = (_file, files) => {
 const handlePrintRemove: UploadProps['onRemove'] = (_file, files) => {
     updateUploadCount(printFileCount, files)
     printScriptName.value = files[0]?.name || ""
+    if (!files.length) data.printScriptPath = ""
 }
 
 const handleInputRemove: UploadProps['onRemove'] = (_file, files) => {
@@ -299,7 +302,7 @@ const handleLuaSuccess: UploadProps['onSuccess'] = (res) => {
 
 const handlePrintSuccess: UploadProps['onSuccess'] = (res) => {
     try {
-        getUploadData(res, printTracker.label)
+        data.printScriptPath = getUploadData(res, printTracker.label)
         settleUpload(printTracker)
     } catch (err) {
         settleUpload(printTracker, new Error(getErrorMessage(err, "打印 Lua 上传失败")))
@@ -375,19 +378,6 @@ const validateUploadSelections = () => {
     }
 }
 
-const resolvePrintTemplate = () => {
-    if (!printScriptName.value) return ""
-
-    const mainMatch = luaScriptName.value.match(/^(.*)_DG_V[0-9]+\.lua$/i)
-    const printMatch = printScriptName.value.match(/^(.*)_PRINT_(V[0-9]+)\.lua$/i)
-
-    if (!mainMatch || !printMatch || mainMatch[1] !== printMatch[1]) {
-        throw new Error("打印格式必须与主 Lua 同项目，且命名为 *_PRINT_Vxx.lua")
-    }
-
-    return printMatch[2].toUpperCase()
-}
-
 const createRunID = () => {
     if (crypto.randomUUID) {
         return crypto.randomUUID()
@@ -422,6 +412,7 @@ const resetState = () => {
     isSubmit.value = false
     activeRunID.value = ""
     data.luaScriptPath = ""
+    data.printScriptPath = ""
     data.inputDir = ""
     data.licensePath = ""
     luaScriptName.value = ""
@@ -465,7 +456,6 @@ const generation = async () => {
     try {
         await ruleFormRef.value.validateField("rfCode")
         validateUploadSelections()
-        const printTemplate = resolvePrintTemplate()
 
         const runID = createRunID()
         activeRunID.value = runID
@@ -493,9 +483,9 @@ const generation = async () => {
         const requestData = {
             rf_code: data.rfCode,
             local_script_path: data.luaScriptPath,
+            local_print_script_path: data.printScriptPath,
             local_input_dir: data.inputDir,
             local_license_path: data.licensePath,
-            print_template: printTemplate,
             run_id: runID
         }
         const rep = await InternalApi.startTaskDev<{ task_id: string; run_id: string }>(requestData)
