@@ -26,6 +26,14 @@
                         </el-input>
                     </el-form-item>
 
+                    <el-form-item label="打印格式">
+                        <el-input v-model="data.printScriptPath" placeholder="可选；请选择 PRINT_Vxx.lua">
+                            <template #append>
+                                <el-button @click="openFileDialog('打印 Lua', '/input/Lua')">浏览</el-button>
+                            </template>
+                        </el-input>
+                    </el-form-item>
+
                     <el-form-item label="输入文件夹" prop="inputDir">
                         <el-input v-model="data.inputDir" placeholder="请选择输入文件夹">
                             <template #append>
@@ -101,6 +109,7 @@ type TaskStatus = 'idle' | 'uploading' | 'starting' | 'running' | 'done' | 'erro
 const taskDetails = computed(() => [
     { label: "订单号", value: data.orderNo },
     { label: "Lua 脚本", value: getFileName(data.luaScriptPath) },
+    ...(data.printScriptPath ? [{ label: "打印格式", value: getFileName(data.printScriptPath) }] : []),
 ])
 
 const getFileName = (path: string) => {
@@ -118,6 +127,9 @@ const handleSelect = (ftpNode: FtpNode) => {
     switch (dialogTitle.value) {
         case "Lua 脚本":
             data.luaScriptPath = ftpNode.path
+            break
+        case "打印 Lua":
+            data.printScriptPath = ftpNode.path
             break
         case "输入文件夹":
             data.inputDir = ftpNode.path
@@ -143,6 +155,7 @@ const openFileDialog = async (title: string, path: string = '/') => {
 interface Data {
     orderNo: string
     luaScriptPath: string
+    printScriptPath: string
     inputDir: string
     licenseDir: string
     pgpKeyPath: string
@@ -153,6 +166,7 @@ const ruleFormRef = ref<FormInstance>()
 const data = reactive<Data>({
     orderNo: "",
     luaScriptPath: "",
+    printScriptPath: "",
     inputDir: "",
     licenseDir: "",
     pgpKeyPath: "",
@@ -191,6 +205,7 @@ const resetState = () => {
     isSubmit.value = false
     data.orderNo = ""
     data.luaScriptPath = ""
+    data.printScriptPath = ""
     data.inputDir = ""
     data.licenseDir = ""
     data.pgpKeyPath = ""
@@ -207,6 +222,21 @@ interface TaskMessage {
 
 const isDir = (path: string) => {
     return !path.split('/').pop()?.includes('.')
+}
+
+const resolvePrintTemplate = (luaScriptPath: string, printScriptPath: string) => {
+    if (!printScriptPath) return ""
+
+    const mainName = getFileName(luaScriptPath)
+    const printName = getFileName(printScriptPath)
+    const mainMatch = mainName.match(/^(.*)_DG_V[0-9]+\.lua$/i)
+    const printMatch = printName.match(/^(.*)_PRINT_(V[0-9]+)\.lua$/i)
+
+    if (!mainMatch || !printMatch || mainMatch[1] !== printMatch[1]) {
+        throw new Error("打印格式必须与主 Lua 同项目，且命名为 *_PRINT_Vxx.lua")
+    }
+
+    return printMatch[2].toUpperCase()
 }
 
 const showTaskResult = (msg: TaskMessage) => {
@@ -245,6 +275,8 @@ const generation = async () => {
             return
         }
 
+        const printTemplate = resolvePrintTemplate(data.luaScriptPath, data.printScriptPath)
+
         progress.value = 0
         progressText.value = ""
         taskStatus.value = 'starting'
@@ -256,6 +288,8 @@ const generation = async () => {
             input_dir: data.inputDir,
             license_dir: data.licenseDir,
             pgp_path: data.pgpKeyPath,
+            print_script_path: data.printScriptPath,
+            print_template: printTemplate,
             is_deduplication: data.isDeduplication
         }
         const rep = await InternalApi.startTask(requestData)

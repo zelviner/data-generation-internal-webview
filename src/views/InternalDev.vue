@@ -20,12 +20,24 @@
                     <div class="section-title">上传文件</div>
                     <el-form-item label="Lua 脚本" prop="luaScriptPath">
                         <el-upload ref="luaUploadRef" class="upload-demo" drag :action="uploadUrl" :auto-upload="false"
-                            accept=".lua" :before-upload="beforeUpload" :on-change="handleLuaChange"
+                            accept=".lua" :limit="1" :before-upload="beforeUpload" :on-change="handleLuaChange"
                             :on-remove="handleLuaRemove" :on-success="handleLuaSuccess" :on-error="handleLuaError"
                             :data="uploadLuaData">
                             <el-icon class="el-icon--upload"><i-ep-upload-filled /></el-icon>
                             <div class="el-upload__text">
                                 拖拽 Lua 脚本到此处，或 <em>点击上传</em>
+                            </div>
+                        </el-upload>
+                    </el-form-item>
+
+                    <el-form-item label="打印格式">
+                        <el-upload ref="printUploadRef" class="upload-demo" drag :action="uploadUrl" :auto-upload="false"
+                            accept=".lua" :limit="1" :before-upload="beforeUpload" :on-change="handlePrintChange"
+                            :on-remove="handlePrintRemove" :on-success="handlePrintSuccess" :on-error="handlePrintError"
+                            :data="uploadLuaData">
+                            <el-icon class="el-icon--upload"><i-ep-upload-filled /></el-icon>
+                            <div class="el-upload__text">
+                                拖拽打印 Lua（可选）到此处，或 <em>点击上传</em>
                             </div>
                         </el-upload>
                     </el-form-item>
@@ -101,6 +113,7 @@ const uploadUrl = `${import.meta.env.VITE_API_URL}/internal/upload`
 // refs
 const ruleFormRef = ref<FormInstance>()
 const luaUploadRef = ref<UploadInstance>()
+const printUploadRef = ref<UploadInstance>()
 const inputUploadRef = ref<UploadInstance>()
 const licenseUploadRef = ref<UploadInstance>()
 
@@ -114,12 +127,14 @@ let wsErrorShown = false
 const activeRunID = ref<string>("")
 const downloadRunID = ref<string>("")
 const luaScriptName = ref<string>("")
+const printScriptName = ref<string>("")
 
 type TaskStatus = 'idle' | 'uploading' | 'starting' | 'running' | 'done' | 'error'
 
 const taskDetails = computed(() => [
     { label: "需求编码", value: data.rfCode },
     { label: "Lua 脚本", value: getFileName(data.luaScriptPath || luaScriptName.value) },
+    ...(printScriptName.value ? [{ label: "打印格式", value: printScriptName.value }] : []),
 ])
 
 const getFileName = (path: string) => {
@@ -192,10 +207,12 @@ interface TaskMessage {
 }
 
 const luaFileCount = ref(0)
+const printFileCount = ref(0)
 const inputFileCount = ref(0)
 const licenseFileCount = ref(0)
 
 const luaTracker: UploadTracker = { label: "Lua 脚本", pending: 0, settled: false }
+const printTracker: UploadTracker = { label: "打印格式", pending: 0, settled: false }
 const inputTracker: UploadTracker = { label: "输入文件夹", pending: 0, settled: false }
 const licenseTracker: UploadTracker = { label: "授权文件", pending: 0, settled: false }
 
@@ -207,6 +224,10 @@ const handleLuaChange: UploadProps['onChange'] = (_file, files) => {
     updateUploadCount(luaFileCount, files)
     luaScriptName.value = files[0]?.name || ""
 }
+const handlePrintChange: UploadProps['onChange'] = (_file, files) => {
+    updateUploadCount(printFileCount, files)
+    printScriptName.value = files[0]?.name || ""
+}
 const handleInputChange: UploadProps['onChange'] = (_file, files) => updateUploadCount(inputFileCount, files)
 const handleLicenseChange: UploadProps['onChange'] = (_file, files) => updateUploadCount(licenseFileCount, files)
 
@@ -214,6 +235,11 @@ const handleLuaRemove: UploadProps['onRemove'] = (_file, files) => {
     updateUploadCount(luaFileCount, files)
     luaScriptName.value = files[0]?.name || ""
     if (!files.length) data.luaScriptPath = ""
+}
+
+const handlePrintRemove: UploadProps['onRemove'] = (_file, files) => {
+    updateUploadCount(printFileCount, files)
+    printScriptName.value = files[0]?.name || ""
 }
 
 const handleInputRemove: UploadProps['onRemove'] = (_file, files) => {
@@ -271,6 +297,15 @@ const handleLuaSuccess: UploadProps['onSuccess'] = (res) => {
     }
 }
 
+const handlePrintSuccess: UploadProps['onSuccess'] = (res) => {
+    try {
+        getUploadData(res, printTracker.label)
+        settleUpload(printTracker)
+    } catch (err) {
+        settleUpload(printTracker, new Error(getErrorMessage(err, "打印 Lua 上传失败")))
+    }
+}
+
 const handleInputSuccess: UploadProps['onSuccess'] = (res) => {
     try {
         const path = getUploadData(res, inputTracker.label)
@@ -307,6 +342,7 @@ const handleUploadError = (tracker: UploadTracker, err: Error, file: UploadFile)
 }
 
 const handleLuaError: UploadProps['onError'] = (err, file) => handleUploadError(luaTracker, err, file)
+const handlePrintError: UploadProps['onError'] = (err, file) => handleUploadError(printTracker, err, file)
 const handleInputError: UploadProps['onError'] = (err, file) => handleUploadError(inputTracker, err, file)
 const handleLicenseError: UploadProps['onError'] = (err, file) => handleUploadError(licenseTracker, err, file)
 
@@ -339,6 +375,19 @@ const validateUploadSelections = () => {
     }
 }
 
+const resolvePrintTemplate = () => {
+    if (!printScriptName.value) return ""
+
+    const mainMatch = luaScriptName.value.match(/^(.*)_DG_V[0-9]+\.lua$/i)
+    const printMatch = printScriptName.value.match(/^(.*)_PRINT_(V[0-9]+)\.lua$/i)
+
+    if (!mainMatch || !printMatch || mainMatch[1] !== printMatch[1]) {
+        throw new Error("打印格式必须与主 Lua 同项目，且命名为 *_PRINT_Vxx.lua")
+    }
+
+    return printMatch[2].toUpperCase()
+}
+
 const createRunID = () => {
     if (crypto.randomUUID) {
         return crypto.randomUUID()
@@ -362,9 +411,11 @@ const resetState = () => {
 
     // 清空上传组件
     luaUploadRef.value?.abort()
+    printUploadRef.value?.abort()
     inputUploadRef.value?.abort()
     licenseUploadRef.value?.abort()
     luaUploadRef.value?.clearFiles()
+    printUploadRef.value?.clearFiles()
     inputUploadRef.value?.clearFiles()
     licenseUploadRef.value?.clearFiles()
 
@@ -374,7 +425,9 @@ const resetState = () => {
     data.inputDir = ""
     data.licensePath = ""
     luaScriptName.value = ""
+    printScriptName.value = ""
     luaFileCount.value = 0
+    printFileCount.value = 0
     inputFileCount.value = 0
     licenseFileCount.value = 0
 
@@ -412,6 +465,7 @@ const generation = async () => {
     try {
         await ruleFormRef.value.validateField("rfCode")
         validateUploadSelections()
+        const printTemplate = resolvePrintTemplate()
 
         const runID = createRunID()
         activeRunID.value = runID
@@ -421,11 +475,15 @@ const generation = async () => {
         taskOverlayVisible.value = true
 
         // 上传文件
-        await Promise.all([
+        const uploads = [
             submitUpload(luaUploadRef.value, luaTracker, luaFileCount.value),
             submitUpload(inputUploadRef.value, inputTracker, inputFileCount.value),
             submitUpload(licenseUploadRef.value, licenseTracker, licenseFileCount.value)
-        ])
+        ]
+        if (printFileCount.value > 0) {
+            uploads.push(submitUpload(printUploadRef.value, printTracker, printFileCount.value))
+        }
+        await Promise.all(uploads)
 
         progressText.value = "上传完成，正在创建任务"
         taskStatus.value = 'starting'
@@ -437,6 +495,7 @@ const generation = async () => {
             local_script_path: data.luaScriptPath,
             local_input_dir: data.inputDir,
             local_license_path: data.licensePath,
+            print_template: printTemplate,
             run_id: runID
         }
         const rep = await InternalApi.startTaskDev<{ task_id: string; run_id: string }>(requestData)
